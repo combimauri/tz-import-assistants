@@ -1,7 +1,11 @@
 const xlsx = require('node-xlsx');
 const admin = require('firebase-admin');
-
 const serviceAccount = require('./keys.json');
+
+const nameIndex = 0;
+const emailIndex = 4;
+const phoneIndex = 3;
+const packageIndex = 6;
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -25,18 +29,22 @@ if (!String.prototype.includes) {
 
 const db = admin.firestore();
 const collection = db.collection('assistants');
-const workSheetsFromBuffer = xlsx.parse('data/jala-assistants.xlsx');
+const workSheetsFromBuffer = xlsx.parse('data/Lista_de_inscritos_2.xlsx');
 const data = workSheetsFromBuffer[0].data.map(currentData => {
-  const package = getPackage(currentData[7]);
+  const package = getPackage(currentData[packageIndex]);
+  const fullName = currentData[nameIndex];
+  const email = currentData[emailIndex];
+  const phone = currentData[phoneIndex];
+
   return {
-    fullName: currentData[1] ? currentData[1].toString().trim() : '',
-    email: currentData[4]
-      ? currentData[4]
+    fullName: fullName ? fullName.toString().trim() : '',
+    email: email
+      ? email
           .toString()
           .replace(/\s/g, '')
           .toLowerCase()
       : '',
-    phone: currentData[5] ? currentData[5].toString().trim() : '',
+    phone: phone ? phone.toString().trim() : '',
     package: package,
     deleteFlag: false,
     insertDate: new Date(),
@@ -47,21 +55,26 @@ const data = workSheetsFromBuffer[0].data.map(currentData => {
   };
 });
 data.shift();
+console.log(data);
 
-data.forEach(assistant => {
-  if (assistant.email) {
-    collection
-      .where('email', '==', assistant.email)
-      .get()
-      .then(matchData => {
-        if (matchData.empty) {
-          addAssistant(assistant);
-        }
-      });
-  } else {
-    addAssistant(assistant);
-  }
-});
+importAssistants(data);
+
+function importAssistants(assistants) {
+  assistants.forEach(assistant => {
+    if (assistant.email) {
+      collection
+        .where('email', '==', assistant.email)
+        .get()
+        .then(matchData => {
+          if (matchData.empty) {
+            addAssistant(assistant);
+          }
+        });
+    } else {
+      addAssistant(assistant);
+    }
+  });
+}
 
 function addAssistant(assistant) {
   collection.add(assistant).then(ref => {
@@ -85,6 +98,8 @@ function getPackage(package) {
     } else if (package.includes('plat')) {
       return 'platinum';
     }
+
+    return package;
   }
   return '';
 }
